@@ -1,21 +1,23 @@
 module Network.HaskellNet.Auth
 where
 
-import Crypto.Hash.MD5
-import qualified Codec.Binary.Base64.String as B64 (encode, decode)
-
-import Data.Word
-import Data.List
-import Data.Bits
-import Data.Array
-import qualified Data.ByteString as B
+import qualified Codec.Binary.Base64.String as B64 (decode, encode)
+import           Crypto.Hash.MD5
+import           Data.Array
+import           Data.Bits
+import qualified Data.ByteString            as B
+import           Data.List
+import           Data.Word
 
 type UserName = String
+
+-- | Password. In case of OAuth2, it is access token.
 type Password = String
 
 data AuthType = PLAIN
               | LOGIN
               | CRAM_MD5
+              | OAUTH2
                 deriving Eq
 
 instance Show AuthType where
@@ -24,6 +26,7 @@ instance Show AuthType where
               showMain PLAIN    = "PLAIN"
               showMain LOGIN    = "LOGIN"
               showMain CRAM_MD5 = "CRAM-MD5"
+              showMain OAUTH2   = "OAUTH2"
 
 b64Encode :: String -> String
 b64Encode = map (toEnum.fromEnum) . B64.encode . map (toEnum.fromEnum)
@@ -60,7 +63,12 @@ cramMD5 :: String -> UserName -> Password -> String
 cramMD5 challenge user pass =
     b64Encode (user ++ " " ++ showOctet (hmacMD5 challenge pass))
 
+oauth2 :: UserName -> Password -> String
+oauth2 user token =
+    b64Encode $ concat ["user=", user, "\1", "auth=Bearer ", token, "\1\1"]
+
 auth :: AuthType -> String -> UserName -> Password -> String
 auth PLAIN    _ u p = plain u p
 auth LOGIN    _ u p = let (u', p') = login u p in unwords [u', p']
 auth CRAM_MD5 c u p = cramMD5 c u p
+auth OAUTH2   _ u p = oauth2 u p
